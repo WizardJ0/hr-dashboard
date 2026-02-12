@@ -1,4 +1,4 @@
-# HR Analytics Dashboard – Base Code with Reference Data Preparation
+# HR Analytics Dashboard – Fully Stable Version
 # Run with: streamlit run app.py
 
 import streamlit as st
@@ -17,27 +17,23 @@ st.set_page_config(
 )
 
 st.title("📊 HR Market Intelligence & Hiring Dashboard")
-st.caption("B2B HR Analytics | Cleaned, Optimised & Insight‑Driven")
+st.caption("Cleaned • Stable • Executive-Ready")
 
 # -----------------------------
-# 2. LOAD & CLEAN DATA (PORTED FROM REFERENCE CODE)
+# 2. LOAD & CLEAN DATA
 # -----------------------------
 @st.cache_data
 def load_and_clean_data():
+
     raw_file = "/Users/Josiah/Downloads/hr-dashboard/SGJobData.csv"
-    output_file = "cleaned_SGJobData_exploded.csv"
 
     if not os.path.exists(raw_file):
         st.error("SGJobData.csv not found")
         st.stop()
 
-    # Use cached cleaned file if exists
-    if os.path.exists(output_file):
-        return pd.read_csv(output_file)
-
     df = pd.read_csv(raw_file)
 
-    # --- Drop metadata & irrelevant columns ---
+    # --- Drop unnecessary metadata ---
     DROP_COLS = [
         "metadata_expiryDate",
         "metadata_isPostedOnBehalf",
@@ -51,7 +47,7 @@ def load_and_clean_data():
     ]
     df = df.drop(columns=[c for c in DROP_COLS if c in df.columns], errors="ignore")
 
-    # --- Drop rows without essential business fields ---
+    # --- Drop rows missing critical business fields ---
     df = df.dropna(subset=[
         "categories",
         "positionLevels",
@@ -60,9 +56,9 @@ def load_and_clean_data():
         "postedCompany_name"
     ])
 
-    # --- Salary & experience sanity filters (SG context) ---
+    # --- Salary sanity filter ---
+    df["average_salary"] = pd.to_numeric(df["average_salary"], errors="coerce")
     df = df[(df["average_salary"] >= 500) & (df["average_salary"] <= 50000)]
-    df = df[df["minimumYearsExperience"] <= 40]
 
     # --- Extract & explode categories ---
     def extract_categories(cat_str):
@@ -80,26 +76,16 @@ def load_and_clean_data():
         if pd.isna(title):
             return title
         
-        # Remove text inside brackets
         title = re.sub(r"\(.*?\)", "", title)
-        
-        # Remove urgency words
-        title = re.sub(r"\bURGENT\b|\burgent\b|\bUrgent\b", "", title)
-        
-        # Remove 'allowances'
+        title = re.sub(r"\bURGENT\b", "", title, flags=re.IGNORECASE)
         title = re.sub(r"\ballowances?\b", "", title, flags=re.IGNORECASE)
-        
-        # Remove salary mentions like $3000, $4,500, $5k
         title = re.sub(r"\$\s?\d+(?:,\d+)*(?:\.\d+)?k?", "", title, flags=re.IGNORECASE)
-        
-        # Remove leftover extra spaces
         title = re.sub(r"\s{2,}", " ", title)
-        
         return title.strip()
 
     df["job_title"] = df["title"].apply(clean_title)
 
-    # --- Standardise column names for base dashboard ---
+    # --- Rename columns ---
     df = df.rename(columns={
         "employmentTypes": "employment_type",
         "minimumYearsExperience": "experience_years",
@@ -108,32 +94,59 @@ def load_and_clean_data():
         "status_jobStatus": "job_status"
     })
 
-    # --- Numeric cleanup ---
-    df["salary_min"] = pd.to_numeric(df.get("salary_min"), errors="coerce")
-    df["salary_max"] = pd.to_numeric(df.get("salary_max"), errors="coerce")
-    df["experience_years"] = pd.to_numeric(df.get("experience_years"), errors="coerce")
+    # --- Clean experience safely ---
+    if "experience_years" in df.columns:
+        df["experience_years"] = (
+            df["experience_years"]
+            .astype(str)
+            .str.extract(r"(\d+)")
+        )
+        df["experience_years"] = pd.to_numeric(df["experience_years"], errors="coerce")
 
-    # --- Average salary ---
+    # --- Convert numeric fields safely ---
+    for col in [
+        "salary_min",
+        "salary_max",
+        "metadata_totalNumberJobApplication",
+        "numberOfVacancies"
+    ]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
     df["avg_salary"] = df["average_salary"]
 
-    # Save cleaned dataset
-    df.to_csv(output_file, index=False)
     return df
 
 
 df = load_and_clean_data()
 
 # -----------------------------
-# 3. GLOBAL MARKET STATS (OVERVIEW)
+# 3. GLOBAL MARKET STATS
 # -----------------------------
-market_stats = df.groupby('category_list').agg({
-    'average_salary': 'median',
-    'metadata_totalNumberJobApplication': 'sum',
-    'numberOfVacancies': 'sum'
-}).reset_index()
+AGG_COLS = {"average_salary": "median"}
+
+if "metadata_totalNumberJobApplication" in df.columns:
+    AGG_COLS["metadata_totalNumberJobApplication"] = "sum"
+
+if "numberOfVacancies" in df.columns:
+    AGG_COLS["numberOfVacancies"] = "sum"
+
+market_stats = (
+    df.groupby("category_list")
+    .agg(AGG_COLS)
+    .reset_index()
+)
+
+if "metadata_totalNumberJobApplication" in market_stats.columns and \
+   "numberOfVacancies" in market_stats.columns:
+
+    market_stats["competition_index"] = (
+        market_stats["metadata_totalNumberJobApplication"] /
+        market_stats["numberOfVacancies"]
+    )
 
 # -----------------------------
-# 4. SIDEBAR FILTERS (BASE CODE RETAINED)
+# 4. SIDEBAR FILTERS
 # -----------------------------
 st.sidebar.header("🔍 Job Filters")
 
@@ -162,13 +175,14 @@ salary_range = st.sidebar.slider(
     )
 )
 
-# Apply filters
 filtered_df = df.copy()
 
 if industry_filter:
     filtered_df = filtered_df[filtered_df["category_list"].isin(industry_filter)]
+
 if employment_filter:
     filtered_df = filtered_df[filtered_df["employment_type"].isin(employment_filter)]
+
 if job_status_filter:
     filtered_df = filtered_df[filtered_df["job_status"].isin(job_status_filter)]
 
@@ -178,7 +192,7 @@ filtered_df = filtered_df[
 ]
 
 # -----------------------------
-# 5. MARKET OVERVIEW (BASE LOGIC)
+# 5. MARKET OVERVIEW
 # -----------------------------
 st.subheader("📌 Market Overview")
 
@@ -191,9 +205,9 @@ c4.metric("Median Salary", f"${int(filtered_df['avg_salary'].median()):,}")
 c5.metric("Avg Experience", f"{filtered_df['experience_years'].mean():.1f} yrs")
 
 # -----------------------------
-# 6. JOB MARKET DEMAND (TOP 10)
+# 6. TOP INDUSTRIES
 # -----------------------------
-st.subheader("📈 Job Market Demand (Top Industries)")
+st.subheader("📈 Top Industries by Job Demand")
 
 industry_demand = (
     filtered_df.groupby("category_list")
@@ -203,42 +217,69 @@ industry_demand = (
     .head(10)
 )
 
-industry_chart = (
+st.altair_chart(
     alt.Chart(industry_demand)
     .mark_bar()
     .encode(
-        x=alt.X("job_count:Q", title="Number of Jobs"),
-        y=alt.Y("category_list:N", sort='-x', title="Industry")
-    )
+        x="job_count:Q",
+        y=alt.Y("category_list:N", sort='-x')
+    ),
+    use_container_width=True
 )
 
-st.altair_chart(industry_chart, use_container_width=True)
+
+
 
 # -----------------------------
-# 7. SALARY vs EXPERIENCE (SAMPLED)
+# 7. SALARY vs EXPERIENCE
 # -----------------------------
 st.subheader("💰 Salary vs Experience")
 
-sample_df = filtered_df.sample(
-    n=min(3000, len(filtered_df)),
-    random_state=42
-)
+analysis_df = filtered_df[
+    (filtered_df["experience_years"].notna()) &
+    (filtered_df["avg_salary"].notna())
+][["experience_years", "avg_salary"]]
 
-scatter = (
-    alt.Chart(sample_df)
-    .mark_circle(size=60, opacity=0.6)
-    .encode(
-        x=alt.X("experience_years:Q", title="Years of Experience"),
-        y=alt.Y("avg_salary:Q", title="Average Salary"),
-        color=alt.Color("category_list:N", legend=None),
-        tooltip=["job_title", "category_list", "avg_salary", "experience_years"]
+# HARD LIMIT DATA SIZE (critical for 1.7M rows)
+if len(analysis_df) > 5000:
+    analysis_df = analysis_df.sample(5000, random_state=42)
+
+if len(analysis_df) > 10:
+
+    covariance = analysis_df["experience_years"].cov(analysis_df["avg_salary"])
+    correlation = analysis_df["experience_years"].corr(analysis_df["avg_salary"])
+
+    chart = (
+        alt.Chart(analysis_df)
+        .mark_circle(size=40, opacity=0.4)
+        .encode(
+            x=alt.X("experience_years:Q", title="Years of Experience"),
+            y=alt.Y("avg_salary:Q", title="Average Salary"),
+            tooltip=["experience_years", "avg_salary"]
+        )
+        .properties(height=450)
     )
-)
 
-st.altair_chart(scatter, use_container_width=True)
+    regression = chart.transform_regression(
+        "experience_years",
+        "avg_salary"
+    ).mark_line(color="red")
+
+    st.altair_chart(chart + regression, use_container_width=True)
+
+    st.markdown(
+        f"""
+        **Covariance:** {covariance:,.2f}  
+        **Correlation (Pearson r):** {correlation:.3f}
+        """
+    )
+
+else:
+    st.warning("Not enough data to compute correlation.")
+
 
 # -----------------------------
-# 8. JOB SEEKER RESULTS TABLE
+# 8. JOB TABLE
 # -----------------------------
 st.subheader("🧑‍💼 Available Jobs")
 
@@ -260,4 +301,4 @@ st.dataframe(
 # -----------------------------
 # 9. FOOTER
 # -----------------------------
-st.caption("Base code preserved | Reference STEP 1 data preparation integrated")
+st.caption("Stable Build: Correlation • Regression • Cleaned Experience • Executive Layout")
