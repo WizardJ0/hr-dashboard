@@ -16,7 +16,7 @@ Business case & objective (2–3 mins)
         2. Better understanding of market trend and competitivenes (To better speak with other HR agencies bring in briefs)
         3. Increase success rate and turnaround time in hiring process (Understanding the candidate & the brief, being informed enough to satisfy both)
     
-    Success criteria: Selling the dashboard to companies
+    Success criteria: Matching expectations of both Employer & Employee
 
 
 Process & data handling (3–4 mins): How you cleaned, transformed, and explored the data.
@@ -31,7 +31,6 @@ Process & data handling (3–4 mins): How you cleaned, transformed, and explored
 - Renames columns for consistency.
 - Cleans and converts data types of experience and salary columns.
 
-
 Dashboard / app walkthrough (3–4 mins): Main views, interactions, and how they answer the business question.
 - Side filters: give flexibility in choosing industry, employment types, job status & Average Salary Range
 - Market Overview: Quick numbers
@@ -40,7 +39,7 @@ Dashboard / app walkthrough (3–4 mins): Main views, interactions, and how they
 - Available Jobs: Showing the quick view of the job details
 
 Challenges & learnings (1–2 mins): Technical/analytical challenges, what you learned, and possible next steps.
-- Cleaning: would like to be more comprehensive
+- Cleaning: would like to be more comprehensive, needs alot of real world practise & guidence
 - Design: Keeping it simple yet function, remembering it's a tool
 - Combining codes from different people
 - Limited prompts from AI
